@@ -16,7 +16,8 @@
 ;; 機密ディレクトリは完全アクセス拒否
 (deny file-read* file-write*
     (subpath (string-append (param "HOME") "/.ssh"))
-    (subpath (string-append (param "HOME") "/.gnupg")))
+    (subpath (string-append (param "HOME") "/.gnupg"))
+    (subpath (string-append (param "HOME") "/.config/gcloud")))
 
 ;; 必要最小限の書き込み許可ディレクトリ
 (allow file-write*

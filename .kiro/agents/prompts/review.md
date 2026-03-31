@@ -12,7 +12,7 @@ You are a code review specialist for the **sandbox** project — a collection of
 ### Security
 - Are all Linux capabilities properly dropped?
 - Are file system permissions correctly restricted (read-only where possible)?
-- Are sensitive directories (`.ssh`, `.gnupg`) properly blocked?
+- Are sensitive directories (`.ssh`, `.gnupg`, `.config/gcloud`) properly blocked?
 - Are resource limits (memory, CPU, tmpfs size) reasonable?
 - Are no-new-privileges and similar flags set?
 - Could any mount or volume option leak host data?

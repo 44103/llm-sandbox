@@ -75,6 +75,7 @@ done
 # 設定ファイル管理
 CONFIG_DIR="$HOME/.config/sandbox"
 CONFIG_FILE="$CONFIG_DIR/paths.conf"
+READ_CONFIG_FILE="$CONFIG_DIR/read-paths.conf"
 
 # デフォルト設定ファイルの生成
 if [[ ! -f "$CONFIG_FILE" ]]; then
@@ -104,12 +105,21 @@ fi
 TEMP_PROFILE=$(mktemp /tmp/sandbox-profile.XXXXXX)
 trap 'rm -f "$TEMP_PROFILE"; command -v tmux >/dev/null 2>&1 && [[ -n "$TMUX" ]] && tmux setw monitor-silence 0' EXIT
 
-extra_rules=""
+extra_write_rules=""
 while IFS= read -r line; do
     [[ -z "$line" || "$line" == \#* ]] && continue
     line="${line/#\~/$HOME}"
-    extra_rules+="(allow file-write* (subpath \"${line}\"))"$'\n'
+    extra_write_rules+="(allow file-write* (subpath \"${line}\"))"$'\n'
 done < "$CONFIG_FILE"
+
+extra_read_rules=""
+if [[ -f "$READ_CONFIG_FILE" ]]; then
+    while IFS= read -r line; do
+        [[ -z "$line" || "$line" == \#* ]] && continue
+        line="${line/#\~/$HOME}"
+        extra_read_rules+="(allow file-read* (subpath \"${line}\"))"$'\n'
+    done < "$READ_CONFIG_FILE"
+fi
 
 # ネットワーク許可ルール
 network_rule=""
@@ -120,7 +130,9 @@ fi
 # プロファイルテンプレートにルールを注入
 while IFS= read -r profile_line; do
     if [[ "$profile_line" == ";; __EXTRA_WRITE_PATHS__" ]]; then
-        printf '%s' "$extra_rules"
+        printf '%s' "$extra_write_rules"
+    elif [[ "$profile_line" == ";; __EXTRA_READ_PATHS__" ]]; then
+        printf '%s' "$extra_read_rules"
     elif [[ "$profile_line" == ";; __NETWORK_ALLOW__" ]]; then
         [[ -n "$network_rule" ]] && printf '%s\n' "$network_rule"
     else

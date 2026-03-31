@@ -53,6 +53,7 @@ options+=('-p' "ReadWritePaths='$HOME/.local/share/amazon-q'")
 ## explicit deny list
 options+=('-p' "InaccessiblePaths='$HOME/.ssh'")
 options+=('-p' "InaccessiblePaths='$HOME/.gnupg'")
+options+=('-p' "InaccessiblePaths='$HOME/.config/gcloud'")
 # options+=('-p' "InaccessiblePaths='/etc/passwd'")
 
 ## /tmp

@@ -68,6 +68,7 @@ docker-sandbox python3 script.py
 ### アクセス不可
 - `~/.ssh`（自然に分離される）
 - `~/.gnupg`（自然に分離される）
+- `~/.config/gcloud`（自然に分離される）
 - システムの重要なディレクトリ
 
 ## 元のsandbox.shとの比較

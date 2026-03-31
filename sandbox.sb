@@ -16,7 +16,8 @@
 ;; 機密ディレクトリは完全アクセス拒否
 (deny file-read* file-write*
     (subpath (string-append (param "HOME") "/.ssh"))
-    (subpath (string-append (param "HOME") "/.gnupg")))
+    (subpath (string-append (param "HOME") "/.gnupg"))
+    (subpath (string-append (param "HOME") "/.config/gcloud")))
 
 ;; 必要最小限の書き込み許可ディレクトリ
 (allow file-write*
@@ -53,6 +54,9 @@
 
 ;; 設定ファイル（~/.config/sandbox/paths.conf）から注入される追加書き込みパス
 ;; __EXTRA_WRITE_PATHS__
+
+;; 設定ファイル（~/.config/sandbox/read-paths.conf）から注入される追加読み込みパス
+;; __EXTRA_READ_PATHS__
 
 ;; ========================================
 ;; ネットワーク制限

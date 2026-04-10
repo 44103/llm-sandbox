@@ -24,6 +24,7 @@
     (subpath (param "WORKING_DIR"))
     (subpath (string-append (param "HOME") "/.config"))
     (subpath (string-append (param "HOME") "/.cache"))
+    (subpath (string-append (param "HOME") "/.local/bin"))
     (subpath "/var/folders")
     (subpath "/private/var/folders")
     (subpath "/tmp")
@@ -52,7 +53,7 @@
 (allow file-read* file-read-metadata
     (subpath "/Applications/Kiro CLI.app"))
 
-;; 設定ファイル（~/.config/sandbox/paths.conf）から注入される追加書き込みパス
+;; 設定ファイル（~/.config/sandbox/writable-paths.conf）から注入される追加書き込みパス
 ;; __EXTRA_WRITE_PATHS__
 
 ;; 設定ファイル（~/.config/sandbox/read-paths.conf）から注入される追加読み込みパス

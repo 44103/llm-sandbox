@@ -2,16 +2,43 @@
 
 set -e
 
-tmux setw monitor-silence 3
-trap 'tmux setw monitor-silence 0' EXIT
+# Clean Windows environment variables (remove \r)
+if [ -n "$WINHOME" ]; then
+  WINHOME=$(echo "$WINHOME" | tr -d '\r')
+fi
 
 WORKING_DIR=$(pwd)
+
+# 危険コマンドの実行拒否
+if [ $# -gt 0 ]; then
+  case "$(basename "$1")" in
+    sudo|su|chroot)
+      echo "ERROR: '$1' is not allowed in sandbox." >&2
+      exit 1
+      ;;
+  esac
+fi
+
+# 設定ファイル: スクリプトと同じディレクトリの writable-paths.conf を参照
+SCRIPT_PATH="${BASH_SOURCE[0]}"
+while [ -L "$SCRIPT_PATH" ]; do
+    SCRIPT_PATH="$(readlink "$SCRIPT_PATH")"
+    [[ "$SCRIPT_PATH" != /* ]] && SCRIPT_PATH="$(dirname "${BASH_SOURCE[0]}")/$SCRIPT_PATH"
+done
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+CONFIG_FILE="$SCRIPT_DIR/writable-paths.conf"
+
+# 旧ファイル名からの自動マイグレーション
+OLD_CONFIG_FILE="$SCRIPT_DIR/paths.conf"
+if [[ -f "$OLD_CONFIG_FILE" && ! -f "$CONFIG_FILE" ]]; then
+    mv "$OLD_CONFIG_FILE" "$CONFIG_FILE"
+    echo "Migrated config: paths.conf -> writable-paths.conf" >&2
+fi
 
 options=()
 
 # privilege
 options+=('-p' 'NoNewPrivileges=yes')
-
 
 # Device Access
 options+=('-p' 'PrivateDevices=yes')
@@ -21,46 +48,47 @@ options+=('-p' 'DeviceAllow=/dev/random r')
 options+=('-p' 'DeviceAllow=/dev/urandom r')
 
 # User
-options+=('-p' 'PrivateUsers=yes')
+options+=('-p' 'PrivateUsers=no')
 options+=('-p' 'LockPersonality=yes')
-
-# Process
-options+=('-p' 'PrivatePIDs=yes')
 
 # Mount
 options+=('-p' 'PrivateMounts=yes')
 
 # Network
 options+=('-p' 'PrivateNetwork=no')
-options+=('-p' 'RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6')
-
-# IPC
-options+=('-p' 'PrivateIPC=yes')
+options+=('-p' 'RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_VSOCK')
 
 # filesystem
-
 options+=('-p' 'ProtectSystem=strict')
-
-## grant access to home directories, but only to read (no write)	
 options+=('-p' 'ProtectHome=read-only')
-options+=('-p' "ReadWritePaths='$WORKING_DIR'")
-options+=('-p' "ReadWritePaths='$HOME/.config'")
-options+=('-p' "ReadWritePaths='$HOME/.cache'")
-options+=('-p' "ReadWritePaths='$HOME/.aws/amazonq'")
-options+=('-p' "ReadWritePaths='$HOME/.local/share/amazon-q'")
 
+# 基本の書き込み許可パス
+options+=('-p' "ReadWritePaths=$WORKING_DIR")
+options+=('-p' "ReadWritePaths=$HOME/.config")
+options+=('-p' "ReadWritePaths=$HOME/.cache")
+options+=('-p' "ReadWritePaths=$HOME/.local/share")
+options+=('-p' "ReadWritePaths=$HOME/.kiro")
+options+=('-p' "ReadWritePaths=$HOME/.aws")
+options+=('-p' "ReadWritePaths=$HOME/.local/bin")
+options+=('-p' "ReadWritePaths=$HOME/.npm")
 
-## explicit deny list
-options+=('-p' "InaccessiblePaths='$HOME/.ssh'")
-options+=('-p' "InaccessiblePaths='$HOME/.gnupg'")
-options+=('-p' "InaccessiblePaths='$HOME/.config/gcloud'")
-# options+=('-p' "InaccessiblePaths='/etc/passwd'")
+# paths.conf から追加の書き込み許可パスを読み込み
+while IFS= read -r line; do
+    [[ -z "$line" || "$line" == \#* ]] && continue
+    line="${line/#\~/$HOME}"
+    [ -e "$line" ] && options+=('-p' "ReadWritePaths=$line")
+done < "$CONFIG_FILE"
 
-## /tmp
-options+=('-p' 'PrivateTmp=yes')
+# explicit deny list
+options+=('-p' "InaccessiblePaths=$HOME/.ssh")
+options+=('-p' "InaccessiblePaths=$HOME/.gnupg")
+options+=('-p' "InaccessiblePaths=$HOME/.config/gcloud")
 
-## /proc
-options+=('-p' 'ProtectProc=invisible')
+# /tmp
+options+=('-p' 'PrivateTmp=no')
+
+# /proc
+options+=('-p' 'ProtectProc=default')
 options+=('-p' 'ProcSubset=pid')
 
 # /sys/fs/cgroup
@@ -70,40 +98,21 @@ options+=('-p' 'RestrictFileSystems=ext4 tmpfs proc sysfs')
 
 # syscall
 options+=('-p' 'SystemCallArchitectures=native')
-options+=('-p' 'SystemCallFilter="@system-service"')
-options+=('-p' 'SystemCallFilter="~@privileged @debug"')
+options+=('-p' 'SystemCallFilter=@system-service')
+options+=('-p' 'SystemCallFilter=~@privileged @debug')
 options+=('-p' 'SystemCallErrorNumber=EPERM')
 
-
 # other
-
-## clock
 options+=('-p' 'ProtectClock=yes')
-
-## hostname
 options+=('-p' 'ProtectHostname=yes')
-
-# kernel log
 options+=('-p' 'ProtectKernelLogs=yes')
-
-# kernel modules
 options+=('-p' 'ProtectKernelModules=yes')
-
-# kernel tunables
 options+=('-p' 'ProtectKernelTunables=yes')
-
-# namespace
 options+=('-p' 'RestrictNamespaces=yes')
-
-# realtime
 options+=('-p' 'RestrictRealtime=yes')
-
-# setuid/gid
 options+=('-p' 'RestrictSUIDSGID=yes')
-
-# capabilities
-options+=('-p' 'CapabilityBoundingSet=""')
-options+=('-p' 'AmbientCapabilities=""')
+options+=('-p' 'CapabilityBoundingSet=')
+options+=('-p' 'AmbientCapabilities=')
 options+=('-p' 'MemoryDenyWriteExecute=no')
 options+=('-p' 'UMask=0077')
 options+=('-p' 'CoredumpFilter=0')
@@ -112,7 +121,7 @@ options+=('-p' 'NotifyAccess=none')
 
 systemd-run \
   --user \
-  --pipe \
+  --pty \
   --wait \
   --collect \
   --same-dir \

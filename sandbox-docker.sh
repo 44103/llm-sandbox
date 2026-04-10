@@ -19,8 +19,8 @@ docker_options+=('--tty')
 docker_options+=('--security-opt=no-new-privileges:true')  # NoNewPrivileges equivalent
 docker_options+=('--cap-drop=ALL')  # Drop all capabilities
 docker_options+=('--read-only')  # Read-only root filesystem
-docker_options+=('--tmpfs=/tmp:noexec,nosuid,nodev,size=100m')  # Private tmp
-docker_options+=('--tmpfs=/var/tmp:noexec,nosuid,nodev,size=100m')
+docker_options+=('--tmpfs=/tmp:exec,nosuid,nodev,size=500m')  # Private tmp (exec allowed for npx)
+docker_options+=('--tmpfs=/var/tmp:exec,nosuid,nodev,size=500m')
 docker_options+=('--tmpfs=/run:noexec,nosuid,nodev,size=100m')
 
 # User mapping
@@ -58,9 +58,9 @@ done
 
 # Mount writable directories
 writable_dirs=(
-    ".config"
     ".cache"
-    ".aws/amazonq"
+    ".local/bin"
+    ".npm"
 )
 
 for dir in "${writable_dirs[@]}"; do
@@ -68,24 +68,44 @@ for dir in "${writable_dirs[@]}"; do
         docker_options+=("--volume=${HOME}/${dir}:${HOME}/${dir}:rw")
     fi
 done
-# Mount Amazon Q data directory (OS-specific paths)
-if [[ "$(uname -s)" == "Darwin" ]]; then
-    # macOS
-    if [ -d "${HOME}/Library/Application Support/amazon-q" ]; then
-        docker_options+=("--volume=${HOME}/Library/Application Support/amazon-q:${HOME}/.local/share/amazon-q:rw")
-    fi
-else
-    # Linux and other Unix-like systems
-    if [ -d "${HOME}/.local/share/amazon-q" ]; then
-        docker_options+=("--volume=${HOME}/.local/share/amazon-q:${HOME}/.local/share/amazon-q:rw")
-    fi
+
+# Create .npm directory if not exists
+if [ ! -d "${HOME}/.npm" ]; then
+    mkdir -p "${HOME}/.npm"
 fi
+docker_options+=("--volume=${HOME}/.npm:${HOME}/.npm:rw")
+
+# Mount .config but exclude kiro-cli/mcp.json to avoid MCP path issues
+if [ -d "${HOME}/.config" ]; then
+    docker_options+=("--volume=${HOME}/.config:${HOME}/.config:rw")
+fi
+
+# Mount .kiro directory (create if not exists)
+if [ ! -d "${HOME}/.kiro" ]; then
+    mkdir -p "${HOME}/.kiro"
+fi
+docker_options+=("--volume=${HOME}/.kiro:${HOME}/.kiro:rw")
+
+# Mount .local/share/kiro-cli directory (create if not exists)
+if [ ! -d "${HOME}/.local/share/kiro-cli" ]; then
+    mkdir -p "${HOME}/.local/share/kiro-cli"
+fi
+docker_options+=("--volume=${HOME}/.local/share/kiro-cli:${HOME}/.local/share/kiro-cli:rw")
 
 # Environment variables
 docker_options+=("--env=PATH=${PATH}")
 docker_options+=("--env=HOME=${HOME}")
 docker_options+=("--env=USER=${USER_NAME}")
 docker_options+=("--env=TERM=${TERM:-xterm}")
+docker_options+=("--env=LANG=${LANG:-ja_JP.UTF-8}")
+
+# Pass MCP-related environment variables if set
+if [ -n "${CONFLUENCE_PERSONAL_ACCESS_TOKEN}" ]; then
+    docker_options+=("--env=CONFLUENCE_PERSONAL_ACCESS_TOKEN=${CONFLUENCE_PERSONAL_ACCESS_TOKEN}")
+fi
+if [ -n "${JIRA_PERSONAL_ACCESS_TOKEN}" ]; then
+    docker_options+=("--env=JIRA_PERSONAL_ACCESS_TOKEN=${JIRA_PERSONAL_ACCESS_TOKEN}")
+fi
 
 # Resource limits
 docker_options+=('--memory=1g')
@@ -97,8 +117,8 @@ docker_options+=('--cpus=1.0')
 # Set hostname to prevent information leakage
 docker_options+=('--hostname=sandbox')
 
-# Use custom image with Amazon Q CLI
-IMAGE="sandbox-amazonq:latest"
+# Use custom image with Kiro CLI
+IMAGE="sandbox-kiro:latest"
 
 # Check if image exists, if not build it
 if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then

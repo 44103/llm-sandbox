@@ -74,8 +74,15 @@ done
 
 # 設定ファイル管理
 CONFIG_DIR="$HOME/.config/sandbox"
-CONFIG_FILE="$CONFIG_DIR/paths.conf"
+CONFIG_FILE="$CONFIG_DIR/writable-paths.conf"
 READ_CONFIG_FILE="$CONFIG_DIR/read-paths.conf"
+
+# 旧ファイル名からの自動マイグレーション
+OLD_CONFIG_FILE="$CONFIG_DIR/paths.conf"
+if [[ -f "$OLD_CONFIG_FILE" && ! -f "$CONFIG_FILE" ]]; then
+    mv "$OLD_CONFIG_FILE" "$CONFIG_FILE"
+    echo "Migrated config: paths.conf -> writable-paths.conf" >&2
+fi
 
 # デフォルト設定ファイルの生成
 if [[ ! -f "$CONFIG_FILE" ]]; then

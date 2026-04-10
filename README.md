@@ -37,11 +37,11 @@ sandbox --network command args...
 ```
 
 #### 設定ファイル
-ツール固有の書き込み許可パスは `~/.config/sandbox/paths.conf` で管理されます。
+ツール固有の書き込み許可パスは `~/.config/sandbox/writable-paths.conf` で管理されます。
 初回実行時にデフォルト設定が自動生成されます。
 
 ```
-# ~/.config/sandbox/paths.conf
+# ~/.config/sandbox/writable-paths.conf
 # 1行1パス、~ は $HOME に展開されます
 
 ~/Library/Caches/go-build
@@ -63,23 +63,47 @@ git clone https://github.com/imishinist/sandbox.git
 cd sandbox
 ```
 
-### Docker版
+OS を自動判定してインストールするスクリプトを用意しています：
+
+```bash
+./scripts/install.sh
+```
+
+インストール先を変更する場合は `INSTALL_DIR` を指定してください：
+
+```bash
+INSTALL_DIR=~/bin ./scripts/install.sh
+```
+
+### 手動インストール
+
+#### Docker版
 
 ```bash
 ln -s $(pwd)/sandbox-docker.sh ~/.local/bin/sandbox
 ```
 
-### macOS版
+#### macOS版
 
 ```bash
 ln -s $(pwd)/sandbox-macos.sh ~/.local/bin/sandbox
 ```
 
-### systemd-run版（Linux）
+#### systemd-run版（Linux）
 
 ```bash
 ln -s $(pwd)/sandbox-systemd.sh ~/.local/bin/sandbox
 ```
+
+## Fork元への追従
+
+fork リポジトリを利用している場合、以下のスクリプトで upstream の最新を取り込めます：
+
+```bash
+./scripts/sync-upstream.sh
+```
+
+upstream remote が未設定の場合は自動で追加されます。
 
 ## 詳細情報
 

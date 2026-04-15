@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env zsh
 
 set -e
 
@@ -20,10 +20,11 @@ if [ $# -gt 0 ]; then
 fi
 
 # 設定ファイル: スクリプトと同じディレクトリの writable-paths.conf を参照
-SCRIPT_PATH="${BASH_SOURCE[0]}"
+SCRIPT_PATH="${0}"
 while [ -L "$SCRIPT_PATH" ]; do
-    SCRIPT_PATH="$(readlink "$SCRIPT_PATH")"
-    [[ "$SCRIPT_PATH" != /* ]] && SCRIPT_PATH="$(dirname "${BASH_SOURCE[0]}")/$SCRIPT_PATH"
+  LINK_TARGET="$(readlink "$SCRIPT_PATH")"
+  [[ "$LINK_TARGET" != /* ]] && LINK_TARGET="$(dirname "$SCRIPT_PATH")/$LINK_TARGET"
+  SCRIPT_PATH="$LINK_TARGET"
 done
 SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 CONFIG_FILE="$SCRIPT_DIR/writable-paths.conf"
@@ -31,93 +32,93 @@ CONFIG_FILE="$SCRIPT_DIR/writable-paths.conf"
 # 旧ファイル名からの自動マイグレーション
 OLD_CONFIG_FILE="$SCRIPT_DIR/paths.conf"
 if [[ -f "$OLD_CONFIG_FILE" && ! -f "$CONFIG_FILE" ]]; then
-    mv "$OLD_CONFIG_FILE" "$CONFIG_FILE"
-    echo "Migrated config: paths.conf -> writable-paths.conf" >&2
+  mv "$OLD_CONFIG_FILE" "$CONFIG_FILE"
+  echo "Migrated config: paths.conf -> writable-paths.conf" >&2
 fi
 
-options=()
+run_opts=()
 
 # privilege
-options+=('-p' 'NoNewPrivileges=yes')
+run_opts+=('-p' 'NoNewPrivileges=yes')
 
 # Device Access
-options+=('-p' 'PrivateDevices=yes')
-options+=('-p' 'DevicePolicy=closed')
-options+=('-p' 'DeviceAllow=/dev/null rw')
-options+=('-p' 'DeviceAllow=/dev/random r')
-options+=('-p' 'DeviceAllow=/dev/urandom r')
+run_opts+=('-p' 'PrivateDevices=yes')
+run_opts+=('-p' 'DevicePolicy=closed')
+run_opts+=('-p' 'DeviceAllow=/dev/null rw')
+run_opts+=('-p' 'DeviceAllow=/dev/random r')
+run_opts+=('-p' 'DeviceAllow=/dev/urandom r')
 
 # User
-options+=('-p' 'PrivateUsers=no')
-options+=('-p' 'LockPersonality=yes')
+run_opts+=('-p' 'PrivateUsers=no')
+run_opts+=('-p' 'LockPersonality=yes')
 
 # Mount
-options+=('-p' 'PrivateMounts=yes')
+run_opts+=('-p' 'PrivateMounts=yes')
 
 # Network
-options+=('-p' 'PrivateNetwork=no')
-options+=('-p' 'RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_VSOCK')
+run_opts+=('-p' 'PrivateNetwork=no')
+run_opts+=('-p' 'RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_VSOCK')
 
 # filesystem
-options+=('-p' 'ProtectSystem=strict')
-options+=('-p' 'ProtectHome=read-only')
+run_opts+=('-p' 'ProtectSystem=strict')
+run_opts+=('-p' 'ProtectHome=read-only')
 
 # 基本の書き込み許可パス
-options+=('-p' "ReadWritePaths=$WORKING_DIR")
-options+=('-p' "ReadWritePaths=$HOME/.config")
-options+=('-p' "ReadWritePaths=$HOME/.cache")
-options+=('-p' "ReadWritePaths=$HOME/.local/share")
-options+=('-p' "ReadWritePaths=$HOME/.kiro")
-options+=('-p' "ReadWritePaths=$HOME/.aws")
-options+=('-p' "ReadWritePaths=$HOME/.local/bin")
-options+=('-p' "ReadWritePaths=$HOME/.npm")
+run_opts+=('-p' "ReadWritePaths=$WORKING_DIR")
+run_opts+=('-p' "ReadWritePaths=$HOME/.config")
+run_opts+=('-p' "ReadWritePaths=$HOME/.cache")
+run_opts+=('-p' "ReadWritePaths=$HOME/.local/share")
+run_opts+=('-p' "ReadWritePaths=$HOME/.kiro")
+run_opts+=('-p' "ReadWritePaths=$HOME/.aws")
+run_opts+=('-p' "ReadWritePaths=$HOME/.local/bin")
+run_opts+=('-p' "ReadWritePaths=$HOME/.npm")
 
 # paths.conf から追加の書き込み許可パスを読み込み
 while IFS= read -r line; do
-    [[ -z "$line" || "$line" == \#* ]] && continue
-    line="${line/#\~/$HOME}"
-    [ -e "$line" ] && options+=('-p' "ReadWritePaths=$line")
+  [[ -z "$line" || "$line" == \#* ]] && continue
+  line="${line/#\~/$HOME}"
+  [ -e "$line" ] && run_opts+=('-p' "ReadWritePaths=$line")
 done < "$CONFIG_FILE"
 
 # explicit deny list
-options+=('-p' "InaccessiblePaths=$HOME/.ssh")
-options+=('-p' "InaccessiblePaths=$HOME/.gnupg")
-options+=('-p' "InaccessiblePaths=$HOME/.config/gcloud")
+run_opts+=('-p' "InaccessiblePaths=$HOME/.ssh")
+run_opts+=('-p' "InaccessiblePaths=$HOME/.gnupg")
+run_opts+=('-p' "InaccessiblePaths=$HOME/.config/gcloud")
 
 # /tmp
-options+=('-p' 'PrivateTmp=no')
+run_opts+=('-p' 'PrivateTmp=no')
 
 # /proc
-options+=('-p' 'ProtectProc=default')
-options+=('-p' 'ProcSubset=pid')
+run_opts+=('-p' 'ProtectProc=default')
+run_opts+=('-p' 'ProcSubset=pid')
 
 # /sys/fs/cgroup
-options+=('-p' 'ProtectControlGroups=yes')
+run_opts+=('-p' 'ProtectControlGroups=yes')
 
-options+=('-p' 'RestrictFileSystems=ext4 tmpfs proc sysfs')
+run_opts+=('-p' 'RestrictFileSystems=ext4 tmpfs proc sysfs')
 
 # syscall
-options+=('-p' 'SystemCallArchitectures=native')
-options+=('-p' 'SystemCallFilter=@system-service')
-options+=('-p' 'SystemCallFilter=~@privileged @debug')
-options+=('-p' 'SystemCallErrorNumber=EPERM')
+run_opts+=('-p' 'SystemCallArchitectures=native')
+run_opts+=('-p' 'SystemCallFilter=@system-service')
+run_opts+=('-p' 'SystemCallFilter=~@privileged @debug')
+run_opts+=('-p' 'SystemCallErrorNumber=EPERM')
 
 # other
-options+=('-p' 'ProtectClock=yes')
-options+=('-p' 'ProtectHostname=yes')
-options+=('-p' 'ProtectKernelLogs=yes')
-options+=('-p' 'ProtectKernelModules=yes')
-options+=('-p' 'ProtectKernelTunables=yes')
-options+=('-p' 'RestrictNamespaces=yes')
-options+=('-p' 'RestrictRealtime=yes')
-options+=('-p' 'RestrictSUIDSGID=yes')
-options+=('-p' 'CapabilityBoundingSet=')
-options+=('-p' 'AmbientCapabilities=')
-options+=('-p' 'MemoryDenyWriteExecute=no')
-options+=('-p' 'UMask=0077')
-options+=('-p' 'CoredumpFilter=0')
-options+=('-p' 'KeyringMode=private')
-options+=('-p' 'NotifyAccess=none')
+run_opts+=('-p' 'ProtectClock=yes')
+run_opts+=('-p' 'ProtectHostname=yes')
+run_opts+=('-p' 'ProtectKernelLogs=yes')
+run_opts+=('-p' 'ProtectKernelModules=yes')
+run_opts+=('-p' 'ProtectKernelTunables=yes')
+run_opts+=('-p' 'RestrictNamespaces=yes')
+run_opts+=('-p' 'RestrictRealtime=yes')
+run_opts+=('-p' 'RestrictSUIDSGID=yes')
+run_opts+=('-p' 'CapabilityBoundingSet=')
+run_opts+=('-p' 'AmbientCapabilities=')
+run_opts+=('-p' 'MemoryDenyWriteExecute=no')
+run_opts+=('-p' 'UMask=0077')
+run_opts+=('-p' 'CoredumpFilter=0')
+run_opts+=('-p' 'KeyringMode=private')
+run_opts+=('-p' 'NotifyAccess=none')
 
 systemd-run \
   --user \
@@ -126,5 +127,5 @@ systemd-run \
   --collect \
   --same-dir \
   -E PATH="$PATH" \
-  "${options[@]}" \
+  "${run_opts[@]}" \
   "$@"
